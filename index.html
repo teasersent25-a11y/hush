@@ -771,6 +771,8 @@ html{--sun-top:60%}
         <div id="qrbox" style="display:flex;justify-content:center;margin:10px 0 6px"></div>
         <div class="bk-ref" id="refCode"></div>
         <div id="doneSummary" class="hint" style="text-align:center"></div>
+        <a id="waBtn" class="btn btn-primary" target="_blank" rel="noopener" style="width:100%;margin-top:16px;display:block;text-align:center">Send booking to HUSH on WhatsApp</a>
+        <p class="bk-note" style="margin-top:8px">Tap to send — your spot is held once we receive it.</p>
         <p class="bk-note">Screenshot your QR code &amp; reference — show it at the door.</p>
         <button class="btn btn-ghost" id="againBtn" style="width:100%;margin-top:16px">Book another date</button>
       </div>
@@ -867,7 +869,7 @@ html{--sun-top:60%}
     </div>
   </div>
   <div class="legal"><span>© 2026 HUSH — Rooftop Beach Club · Tenerife</span><span class="grad-text">Parties in Paradise</span></div>
-</div><div style="text-align:center;color:#3a3a44;font-size:10px;letter-spacing:.2em;padding:6px 0 10px">v2026.10.06-A</div>
+</div><div style="text-align:center;color:#3a3a44;font-size:10px;letter-spacing:.2em;padding:6px 0 10px">v2026.10.29-A</div>
 </footer>
 
 <script>
@@ -1046,15 +1048,17 @@ document.getElementById('signup').addEventListener('submit',function(e){
     ['brA','brC'].forEach(function(k){var el=document.getElementById('left_'+k);
       if(el&&state.date&&state.date.getDay()!==0){el.textContent='Sundays only';el.style.color='#ff8a8a';}});
   }
+  var PAYMENTS_ON=false; // PayPal switched off: all bookings are reservations, paid at the venue
   var ov=document.getElementById('bkOverlay');
   document.getElementById('checkoutBtn').addEventListener('click',function(){
-    var free=total()===0;
+    var free=total()===0||!PAYMENTS_ON;
     document.getElementById('coView').style.display='block';document.getElementById('doneView').style.display='none';
     document.getElementById('coTitle').textContent=free?'Reserve your spot':'Checkout';
+    document.getElementById('freeBtn').textContent=total()>0?'Confirm booking — pay on arrival':'Confirm free reservation';
     document.getElementById('coSummary').innerHTML='<b>'+tierLines()+'</b><br>'+fmt(state.date)+' · admits up to '+guests()+' guest'+(guests()>1?'s':'');
     document.getElementById('paypal-buttons').style.display=free?'none':'block';
     document.getElementById('freeBtn').style.display=free?'block':'none';
-    document.getElementById('coNote').textContent=free?'Free reservation — you\'ll get a QR code to show at the door.':'Secure checkout via PayPal — pay with PayPal or any debit/credit card. You\'ll get a QR ticket to show at the door.';
+    document.getElementById('coNote').textContent=free?(total()>0?'No payment needed now — you pay at the venue. You\'ll get a booking reference and QR code to show at the door.':'Free reservation — you\'ll get a QR code to show at the door.'):'Secure checkout via PayPal — pay with PayPal or any debit/credit card. You\'ll get a QR ticket to show at the door.';
     ov.classList.add('on'); if(!free)renderPayPal();
     if(window.fbq)fbq('track','InitiateCheckout',{value:total(),currency:'EUR',num_items:cnt()});});
   document.getElementById('bkClose').addEventListener('click',function(){ov.classList.remove('on');});
@@ -1072,16 +1076,19 @@ document.getElementById('signup').addEventListener('submit',function(e){
       var cur=(typeof day[x]==='number')?day[x]:STOCK[x];day[x]=Math.max(0,cur-stockUsed(x,state.qty[x]));});
       all[k]=day;saveAll(all);remaining=remainingFor(state.date);}
     var _n=document.getElementById('fName').value.trim();var _e=document.getElementById('fEmail').value.trim();var _p=document.getElementById('fPhone').value.trim();
-    try{fetch('https://formsubmit.co/ajax/info@hushlive.co.uk',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({_subject:'New HUSH booking — '+fmt(state.date)+' — '+_n,Reference:(state.ref||''),Name:_n,Email:_e,Phone:_p,Visit_date:fmt(state.date),Booking:tierLines(),Guests:'up to '+guests(),Total:money(total()),PayPal_ID:(payid||'FREE')})}).catch(function(){});}catch(_err){}
     var ref=state.ref||('HUSH-'+Math.random().toString(36).slice(2,6).toUpperCase()+Math.floor(10+Math.random()*89));
+    var payNote=payid?('Paid · PayPal '+payid):(total()>0?'To pay on arrival':'Free');
+    try{fetch('https://formsubmit.co/ajax/info@hushlive.co.uk',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({_subject:'New HUSH booking — '+fmt(state.date)+' — '+_n,Reference:ref,Name:_n,Email:_e,Phone:_p,Visit_date:fmt(state.date),Booking:tierLines(),Guests:'up to '+guests(),Total:money(total()),Payment:payNote})}).catch(function(){});}catch(_err){}
+    var waTxt='HUSH BOOKING '+ref+'\n'+fmt(state.date)+'\n'+tierLines()+'\nGuests: up to '+guests()+'\nTotal: '+money(total())+' ('+payNote+')\nName: '+_n+'\nPhone: '+_p+'\nEmail: '+_e;
+    var wa=document.getElementById('waBtn'); if(wa){wa.href='https://wa.me/447988849996?text='+encodeURIComponent(waTxt);}
     document.getElementById('refCode').textContent=ref;
-    document.getElementById('doneLead').textContent=total()>0?'Payment received — see you on the roof.':'Reservation confirmed — see you on the roof.';
+    document.getElementById('doneLead').textContent=payid?'Payment received — one last step to lock it in.':'Almost there — one last step to lock in your spot.';
     document.getElementById('doneSummary').innerHTML='<b>'+tierLines()+'</b><br>'+fmt(state.date)+'<br>up to '+guests()+' guest'+(guests()>1?'s':'')+' · '+money(total());
     var payload='HUSH TICKET|'+ref+'|'+fmt(state.date)+'|'+tierLines()+'|'+_n+'|'+_p+(payid?('|'+payid):'');
     var qb=document.getElementById('qrbox'); qb.innerHTML='';
     if(window.QRCode&&QRCode.toCanvas){QRCode.toCanvas(payload,{width:200,margin:1,color:{dark:'#0a0a0c',light:'#ffffff'}},function(err,cv){if(!err){cv.style.borderRadius='12px';qb.appendChild(cv);}});}
     document.getElementById('coView').style.display='none';document.getElementById('doneView').style.display='block';
-    if(window.fbq){if(total()>0)fbq('track','Purchase',{value:total(),currency:'EUR',num_items:cnt(),content_type:'booking'});else fbq('track','Lead');}
+    if(window.fbq){if(payid)fbq('track','Purchase',{value:total(),currency:'EUR',num_items:cnt(),content_type:'booking'});else fbq('track','Lead');}
   }
   document.getElementById('freeBtn').addEventListener('click',function(){
     if(!validateFields())return;
